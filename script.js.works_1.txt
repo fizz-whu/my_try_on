@@ -16,7 +16,7 @@ loader.load('models/glasses.glb', function (gltf) {
     console.error(error);
 });
 
-camera.position.z = 2;
+camera.position.z = 5;
 
 let facemeshModel;
 (async () => {
@@ -30,30 +30,20 @@ video.addEventListener('loadeddata', () => {
 
 async function detectFace() {
     if (facemeshModel) {
-        const predictions = await facemeshModel.estimateFaces({input: video});
+        const predictions = await facemeshModel.estimateFaces(video);
         if (predictions.length > 0) {
             const keypoints = predictions[0].scaledMesh;
             const nose = keypoints[6];
             const leftEye = keypoints[33];
             const rightEye = keypoints[263];
-            const faceWidth = distanceBetweenPoints(leftEye, rightEye);
 
             if (glasses) {
-                const nose3D = projectTo3D(nose);
-                const leftEye3D = projectTo3D(leftEye);
-                const rightEye3D = projectTo3D(rightEye);
+                const avgX = (leftEye[0] + rightEye[0]) / 2;
+                const avgY = (leftEye[1] + rightEye[1]) / 2;
 
-                const avgX = (leftEye3D.x + rightEye3D.x) / 2;
-                const avgY = (leftEye3D.y + rightEye3D.y) / 2;
-
-                glasses.position.set(avgX, avgY, nose3D.z - 0.2);
-                glasses.scale.set(faceWidth / 100, faceWidth / 100, faceWidth / 100);
+                glasses.position.set(avgX - nose[0], -avgY + nose[1], -200);
+                glasses.scale.set(100, 100, 100);
                 glasses.visible = true;
-
-                const dX = rightEye3D.x - leftEye3D.x;
-                const dY = rightEye3D.y - leftEye3D.y;
-                const rotation = Math.atan2(dY, dX);
-                glasses.rotation.set(0, 0, rotation);
             }
         } else {
             if (glasses) {
@@ -75,20 +65,3 @@ function animate() {
     renderer.render(scene, camera);
 }
 animate();
-
-function projectTo3D(point) {
-    const x = (point[0] / video.videoWidth) * 2 - 1;
-    const y = -(point[1] / video.videoHeight) * 2 + 1;
-    const z = 0;
-
-    const vector = new THREE.Vector3(x, y, z);
-    vector.unproject(camera);
-
-    return vector;
-}
-
-function distanceBetweenPoints(point1, point2) {
-    const dx = point1[0] - point2[0];
-    const dy = point1[1] - point2[1];
-    return Math.sqrt(dx * dx + dy * dy);
-}
