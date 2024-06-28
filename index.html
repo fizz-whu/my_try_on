@@ -1,89 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Support Test</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        canvas { 
+            display: block; 
+            width: 800px; 
+            height: 600px; 
+            background-color: lightblue;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="info"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
     <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('output');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+    window.addEventListener('load', function() {
+        const infoDiv = document.getElementById('info');
+        function log(message) {
+            console.log(message);
+            infoDiv.innerHTML += message + '<br>';
+        }
 
-        const facemeshModel = new FaceMesh({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-        });
+        log("Window loaded");
+        log("gl-matrix loaded: " + (typeof mat4 !== 'undefined' && typeof glMatrix !== 'undefined'));
 
-        facemeshModel.setOptions({
-            maxNumFaces: 1,
-            refineLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
+        const canvas = document.getElementById('glCanvas');
+        log("Canvas: " + (canvas ? "found" : "not found"));
 
-        facemeshModel.onResults(onResults);
+        // Force canvas size
+        canvas.width = 800;
+        canvas.height = 600;
 
-        async function startWebcam() {
+        // Test 2D drawing
+        const ctx2d = canvas.getContext('2d');
+        ctx2d.fillStyle = 'red';
+        ctx2d.fillRect(10, 10, 100, 100);
+        log("2D rectangle drawn");
+
+        // Check for WebGL support
+        var webglSupport = (function () {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                console.log("Webcam started");
-            } catch (error) {
-                console.error("Error starting webcam:", error);
+                var canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+            } catch(e) {
+                return false;
             }
+        })();
+
+        log("WebGL Support: " + webglSupport);
+
+        if (!webglSupport) {
+            log("WebGL is not supported in this browser.");
+            return;
         }
 
-        video.addEventListener('loadeddata', async () => {
-            console.log("Video loaded");
-            await detectFace();
-        });
+        // Try to get WebGL2 context
+        let gl = canvas.getContext("webgl2");
+        log("WebGL2 context: " + (gl ? "created" : "failed"));
 
-        async function detectFace() {
-            if (facemeshModel) {
-                console.log("Detecting face...");
-                await facemeshModel.send({ image: video });
-                requestAnimationFrame(detectFace);
-            }
+        // If WebGL2 failed, try WebGL1
+        if (!gl) {
+            gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+            log("Fallback WebGL1 context: " + (gl ? "created" : "failed"));
         }
 
-        function onResults(results) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                console.log("Face landmarks detected");
-                const keypoints = results.multiFaceLandmarks[0];
-                drawGlasses(keypoints);
-            }
+        if (!gl) {
+            log("Unable to initialize WebGL. Your browser may not support it.");
+            return;
         }
 
-        function drawGlasses(keypoints) {
-            const nose = keypoints[6];
-            const leftEye = keypoints[33];
-            const rightEye = keypoints[263];
-            const faceWidth = distanceBetweenPoints(leftEye, rightEye);
-            const glassesWidth = faceWidth * canvas.width;
+        // Log WebGL information
+        log("WebGL Version: " + gl.getParameter(gl.VERSION));
+        log("WebGL Vendor: " + gl.getParameter(gl.VENDOR));
+        log("WebGL Renderer: " + gl.getParameter(gl.RENDERER));
 
-            const leftEyeX = leftEye.x * canvas.width;
-            const leftEyeY = leftEye.y * canvas.height;
+        // Check for necessary extensions
+        log("ANGLE_instanced_arrays extension: " + (gl.getExtension('ANGLE_instanced_arrays') ? "supported" : "not supported"));
+        log("OES_vertex_array_object extension: " + (gl.getExtension('OES_vertex_array_object') ? "supported" : "not supported"));
+        log("WEBGL_depth_texture extension: " + (gl.getExtension('WEBGL_depth_texture') ? "supported" : "not supported"));
 
-            const rightEyeX = rightEye.x * canvas.width;
-            const rightEyeY = rightEye.y * canvas.height;
+        // Log max texture size
+        log("Max Texture Size: " + gl.getParameter(gl.MAX_TEXTURE_SIZE));
 
-            const noseX = nose.x * canvas.width;
-            const noseY = nose.y * canvas.height;
+        // Log max viewport dimensions
+        const maxViewportDims = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+        log("Max Viewport Dimensions: " + maxViewportDims[0] + "x" + maxViewportDims[1]);
 
-            const glassesImage = new Image();
-            glassesImage.src = 'models/glasses.png'; // Path to your 2D glasses image
-            glassesImage.onload = () => {
-                const glassesHeight = glassesImage.height * (glassesWidth / glassesImage.width);
-                const glassesX = noseX - (glassesWidth / 2);
-                const glassesY = noseY - (glassesHeight / 2);
-                ctx.drawImage(glassesImage, glassesX, glassesY, glassesWidth, glassesHeight);
-            };
+        // Check for WebGL2-specific features if it's WebGL2
+        if (gl instanceof WebGL2RenderingContext) {
+            log("WebGL2-specific features:");
+            log("- Max 3D Texture Size: " + gl.getParameter(gl.MAX_3D_TEXTURE_SIZE));
+            log("- Max Draw Buffers: " + gl.getParameter(gl.MAX_DRAW_BUFFERS));
         }
 
-        function distanceBetweenPoints(point1, point2) {
-            const dx = point1.x - point2.x;
-            const dy = point1.y - point2.y;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-
-        startWebcam();
+        log("WebGL initialization and checks completed!");
+    });
     </script>
 </body>
 </html>
