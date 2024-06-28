@@ -3,19 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Virtual Glasses Try-On</title>
-    <link rel="stylesheet" href="css/style.css">
-    <style>
-        body { margin: 0; overflow: hidden; }
-        #webcam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        canvas { position: absolute; top: 0; left: 0; }
-    </style>
+    <title>FaceMesh Glasses</title>
 </head>
 <body>
-    <video id="webcam" autoplay muted playsinline></video>
+    <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/facemesh"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
     <script src="script.js"></script>
 </body>
