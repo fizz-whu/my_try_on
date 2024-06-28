@@ -1,16 +1,89 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FaceMesh Glasses</title>
-</head>
-<body>
-    <video id="webcam" autoplay playsinline width="640" height="480" style="display: none;"></video>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="script.js"></script>
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('output');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const facemeshModel = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+        });
+
+        facemeshModel.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        facemeshModel.onResults(onResults);
+
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                console.log("Webcam started");
+            } catch (error) {
+                console.error("Error starting webcam:", error);
+            }
+        }
+
+        video.addEventListener('loadeddata', async () => {
+            console.log("Video loaded");
+            await detectFace();
+        });
+
+        async function detectFace() {
+            if (facemeshModel) {
+                console.log("Detecting face...");
+                await facemeshModel.send({ image: video });
+                requestAnimationFrame(detectFace);
+            }
+        }
+
+        function onResults(results) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                console.log("Face landmarks detected");
+                const keypoints = results.multiFaceLandmarks[0];
+                drawGlasses(keypoints);
+            }
+        }
+
+        function drawGlasses(keypoints) {
+            const nose = keypoints[6];
+            const leftEye = keypoints[33];
+            const rightEye = keypoints[263];
+            const faceWidth = distanceBetweenPoints(leftEye, rightEye);
+            const glassesWidth = faceWidth * canvas.width;
+
+            const leftEyeX = leftEye.x * canvas.width;
+            const leftEyeY = leftEye.y * canvas.height;
+
+            const rightEyeX = rightEye.x * canvas.width;
+            const rightEyeY = rightEye.y * canvas.height;
+
+            const noseX = nose.x * canvas.width;
+            const noseY = nose.y * canvas.height;
+
+            const glassesImage = new Image();
+            glassesImage.src = 'models/glasses.png'; // Path to your 2D glasses image
+            glassesImage.onload = () => {
+                const glassesHeight = glassesImage.height * (glassesWidth / glassesImage.width);
+                const glassesX = noseX - (glassesWidth / 2);
+                const glassesY = noseY - (glassesHeight / 2);
+                ctx.drawImage(glassesImage, glassesX, glassesY, glassesWidth, glassesHeight);
+            };
+        }
+
+        function distanceBetweenPoints(point1, point2) {
+            const dx = point1.x - point2.x;
+            const dy = point1.y - point2.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        startWebcam();
+    </script>
 </body>
 </html>
